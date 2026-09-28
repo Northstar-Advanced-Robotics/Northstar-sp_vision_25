@@ -1,0 +1,10 @@
+# Pinned to the exact versions validated against assets/yolov5.onnx's
+# specific op mix (itself produced by the separate openvino2onnx PyPI tool --
+# see JETSON_ORIN.md "Where assets/yolov5.onnx came from" -- not this
+# script's own dependency). Older onnx (<1.16) is missing IR_VERSION_2023_5_5;
+# newer/older combinations were found to break on this graph's op mix during
+# validation. Re-pin only after re-validating end-to-end: this script +
+# a Jetson trtexec build + tests/detector_video_test.cpp's 604-armor check.
+onnx==1.16.2
+onnx_graphsurgeon==0.6.1
+onnxruntime==1.18.1

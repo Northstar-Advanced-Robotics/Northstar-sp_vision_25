@@ -6,17 +6,18 @@
 #include <opencv2/opencv.hpp>
 #include <thread>
 
+#include "io/camera.hpp"
 #include "tools/thread_safe_queue.hpp"
 
 namespace io
 {
-class USBCamera
+class USBCamera : public CameraBase
 {
 public:
   USBCamera(const std::string & open_name, const std::string & config_path);
-  ~USBCamera();
+  ~USBCamera() override;
   cv::Mat read();
-  void read(cv::Mat & img, std::chrono::steady_clock::time_point & timestamp);
+  void read(cv::Mat & img, std::chrono::steady_clock::time_point & timestamp) override;
   std::string device_name;
 
 private:

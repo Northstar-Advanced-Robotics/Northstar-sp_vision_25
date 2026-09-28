@@ -36,11 +36,15 @@ Solver::Solver(const std::string & config_path) : R_gimbal2world_(Eigen::Matrix3
   t_camera2gimbal_ = Eigen::Matrix<double, 3, 1>(t_camera2gimbal_data.data());
 
   auto camera_matrix_data = yaml["camera_matrix"].as<std::vector<double>>();
-  auto distort_coeffs_data = yaml["distort_coeffs"].as<std::vector<double>>();
   Eigen::Matrix<double, 3, 3, Eigen::RowMajor> camera_matrix(camera_matrix_data.data());
-  Eigen::Matrix<double, 1, 5> distort_coeffs(distort_coeffs_data.data());
   cv::eigen2cv(camera_matrix, camera_matrix_);
-  cv::eigen2cv(distort_coeffs, distort_coeffs_);
+
+  // cv::solvePnP/projectPoints accept any of OpenCV's standard distortion
+  // vector lengths (4, 5, 8, 12, 14) -- read whatever's in the yaml instead
+  // of forcing 5, so a rational_polynomial (8-coefficient) calibration
+  // doesn't get silently truncated to its first 5 values.
+  auto distort_coeffs_data = yaml["distort_coeffs"].as<std::vector<double>>();
+  distort_coeffs_ = cv::Mat(distort_coeffs_data, true).reshape(1, 1);
 }
 
 Eigen::Matrix3d Solver::R_gimbal2world() const { return R_gimbal2world_; }

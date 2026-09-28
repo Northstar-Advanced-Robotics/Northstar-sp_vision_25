@@ -1,9 +1,18 @@
-camera_name: "mindvision"
-exposure_ms: 2
-gamma: 0.5
-vid_pid: "f622:d13a"
+# camera_name: "mindvision"
+# exposure_ms: 2
+# gamma: 0.5
+# vid_pid: "f622:d13a"
 
 # camera_name: "hikrobot"
 # exposure_ms: 3
 # gain: 10.0
 # vid_pid: "2bdf:0001"
+
+camera_name: "usb"
+usb_device: "video0"      # opens /dev/video0
+image_width: 1920
+image_height: 1200
+usb_frame_rate: 50
+usb_exposure: 250         # 1-80000
+usb_gamma: 160
+usb_gain: 10              # 0-96

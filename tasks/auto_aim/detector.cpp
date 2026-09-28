@@ -39,7 +39,10 @@ std::list<Armor> Detector::detect(const cv::Mat & bgr_img, int frame_count)
   // 进行二值化
   cv::Mat binary_img;
   cv::threshold(gray_img, binary_img, threshold_, 255, cv::THRESH_BINARY);
-  cv::imshow("binary_img", binary_img);
+  // Unlike show_result() below, this was never gated by debug_ -- a
+  // pre-existing bug (always trying to open a GUI window regardless of the
+  // debug flag), surfaced by --headless mode having no X server at all.
+  if (debug_) cv::imshow("binary_img", binary_img);
 
   // 获取轮廓点
   std::vector<std::vector<cv::Point>> contours;

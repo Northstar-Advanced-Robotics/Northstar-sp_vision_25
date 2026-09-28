@@ -17,7 +17,9 @@ const std::string keys =
   "{start-index s  | 0                      | 视频起始帧下标    }"
   "{end-index e    | 0                      | 视频结束帧下标    }"
   "{@video_path    | assets/demo/demo.avi   | avi路径}"
-  "{tradition t    |  false                 | 是否使用传统方法识别}";
+  "{tradition t    |  false                 | 是否使用传统方法识别}"
+  "{headless       |                        | "
+  "完全不使用GUI（无imshow/waitKey，不需要任何X服务器），用于纯SSH压测}";
 
 int main(int argc, char * argv[])
 {
@@ -32,14 +34,15 @@ int main(int argc, char * argv[])
   auto start_index = cli.get<int>("start-index");
   auto end_index = cli.get<int>("end-index");
   auto use_tradition = cli.get<bool>("tradition");
+  bool headless_mode = cli.has("headless");
 
   tools::Exiter exiter;
   tools::Plotter plotter;
 
   cv::VideoCapture video(video_path);
 
-  auto_aim::Detector detector(config_path);
-  auto_aim::YOLO yolo(config_path);
+  auto_aim::Detector detector(config_path, !headless_mode);
+  auto_aim::YOLO yolo(config_path, !headless_mode);
 
   video.set(cv::CAP_PROP_POS_FRAMES, start_index);
 
@@ -80,8 +83,10 @@ int main(int argc, char * argv[])
       tools::delta_time(frame_end, frame_start) * 1e3, armors.size());
 
 
-    auto key = cv::waitKey(33);
-    if (key == 'q') break;
+    if (!headless_mode) {
+      auto key = cv::waitKey(33);
+      if (key == 'q') break;
+    }
   }
 
   return 0;
