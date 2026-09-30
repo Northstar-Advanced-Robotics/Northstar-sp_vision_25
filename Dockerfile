@@ -163,20 +163,35 @@ RUN set -eux; \
 # --- NVIDIA CUDA runtime + ONNX Runtime GPU (needed for `device: CUDA`) ---
 # x86_64: cuda-cudart/cublas/cufft/curand/cusparse/cusolver + cudnn9 + nvrtc
 # are the minimal runtime pieces ONNX Runtime's CUDA execution provider
-# needs (no nvcc/full toolkit required). Pinned to CUDA 12.6 + cuDNN 9, the
+# needs (no full toolkit required). Pinned to CUDA 12.6 + cuDNN 9, the
 # combination ONNX Runtime 1.20.x's GPU build expects; the container only
 # needs a driver new enough to run *some* CUDA 12.x, which is what NVIDIA
 # driver backward compatibility guarantees.
+#
+# `device: TENSORRT` additionally needs, at *build* time: CUDA's C headers
+# (cuda-cudart-dev -> /usr/local/cuda/include/cuda_runtime_api.h) and nvcc
+# (cuda-nvcc, for yolos/preprocess_kernel.cu) -- without either,
+# tasks/auto_aim/CMakeLists.txt silently leaves HAVE_TENSORRT undefined and
+# `device: TENSORRT` falls through to OpenVINO, which rejects it as an
+# unknown device. TensorRT itself is pinned (via an apt preferences file, so
+# every libnvinfer*/libnvonnxparsers* package it pulls in transitively gets
+# the same version) to a `+cuda12.6` build: unpinned, apt picks the newest
+# TensorRT in NVIDIA's repo, which is built against a newer CUDA (12.9 or
+# 13.x) than the 12.6 runtime installed here.
 ARG ONNXRUNTIME_VERSION=1.20.1
+ARG TENSORRT_X86_VERSION=10.7.0.23-1+cuda12.6
 RUN set -eux; \
     if [ "$(uname -m)" = "x86_64" ]; then \
         wget -q https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/cuda-keyring_1.1-1_all.deb -O /tmp/cuda-keyring.deb; \
         dpkg -i /tmp/cuda-keyring.deb; \
         rm /tmp/cuda-keyring.deb; \
+        printf 'Package: libnvinfer* libnvonnxparsers*\nPin: version %s\nPin-Priority: 1001\n' \
+            "$TENSORRT_X86_VERSION" > /etc/apt/preferences.d/tensorrt; \
         apt-get update; \
         apt-get install -y --no-install-recommends \
             cuda-cudart-12-6 cuda-nvrtc-12-6 libcublas-12-6 libcufft-12-6 \
             libcurand-12-6 libcusparse-12-6 libcusolver-12-6 libcudnn9-cuda-12 \
+            cuda-cudart-dev-12-6 cuda-nvcc-12-6 \
             libnvinfer-dev libnvinfer-plugin-dev libnvonnxparsers-dev; \
         rm -rf /var/lib/apt/lists/*; \
         url="https://github.com/microsoft/onnxruntime/releases/download/v${ONNXRUNTIME_VERSION}/onnxruntime-linux-x64-gpu-${ONNXRUNTIME_VERSION}.tgz"; \
@@ -265,7 +280,7 @@ RUN set -eux; \
 # dynamic linker's cache since it's not present at build time. Harmless
 # no-op on hosts where that path doesn't exist.
 ENV PATH=/usr/local/cuda/bin:${PATH}
-ENV LD_LIBRARY_PATH=/usr/local/cuda/lib64:${LD_LIBRARY_PATH:-}
+ENV LD_LIBRARY_PATH=/usr/local/cuda/lib64:/usr/lib/wsl/lib:${LD_LIBRARY_PATH:-}
 
 WORKDIR /root/sp_vision_25
 COPY . .

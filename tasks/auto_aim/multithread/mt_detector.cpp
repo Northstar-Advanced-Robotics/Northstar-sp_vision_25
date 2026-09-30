@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <chrono>
+#include <stdexcept>
 
 namespace auto_aim
 {
@@ -84,6 +85,11 @@ MultiThreadDetector::MultiThreadDetector(const std::string & config_path, bool d
       kTrtRingSize, engine_path);
     return;  // skip the OpenVINO compiled_model_ setup below -- unused in TensorRT mode
   }
+#else
+  if (device_ == "TENSORRT")
+    throw std::runtime_error(
+      "device: TENSORRT requires building with TensorRT support, but TensorRT "
+      "wasn't found at configure time (see JETSON_ORIN.md)");
 #endif
 
   auto model = core_.read_model(model_path);
