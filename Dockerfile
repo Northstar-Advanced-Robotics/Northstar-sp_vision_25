@@ -233,17 +233,39 @@ RUN set -eux; \
 # version than R36.4.7, check `apt-cache policy cuda-libraries-12-6` on the
 # device first -- the L4T apt suite (`r36.4` below) must match
 # `cat /etc/nv_tegra_release`.
+#
+# JetPack 7 (L4T R38+, Ubuntu 24.04, CUDA 13): use ./docker_build_jetson.sh
+# instead of a bare `docker build`. It reads the host's L4T release, apt
+# sources and CUDA version and passes them in as JETSON_APT_SOURCES /
+# JETSON_CUDA_VERSION, so the same Dockerfile serves both JetPacks. The
+# defaults below are the JetPack 6 (R36.4.7) values. Only TensorRT is
+# required here: the CUDA runtime/cuDNN/VPI packages are installed if the
+# repo has them, since docker_enter_jetson.sh bind-mounts the host's full
+# CUDA install over /usr/local/cuda at run time anyway.
+ARG JETSON_APT_SOURCES=""
+ARG JETSON_CUDA_VERSION=12.6
 RUN set -eux; \
     if [ "$(uname -m)" = "aarch64" ]; then \
         wget -qO /etc/apt/trusted.gpg.d/jetson-ota-public.asc https://repo.download.nvidia.com/jetson/jetson-ota-public.asc; \
         chmod 644 /etc/apt/trusted.gpg.d/jetson-ota-public.asc; \
-        echo 'deb https://repo.download.nvidia.com/jetson/common r36.4 main' > /etc/apt/sources.list.d/nvidia-l4t-apt-source.list; \
-        echo 'deb https://repo.download.nvidia.com/jetson/t234 r36.4 main' >> /etc/apt/sources.list.d/nvidia-l4t-apt-source.list; \
+        if [ -n "$JETSON_APT_SOURCES" ]; then \
+            printf '%s\n' "$JETSON_APT_SOURCES" > /etc/apt/sources.list.d/nvidia-l4t-apt-source.list; \
+        else \
+            echo 'deb https://repo.download.nvidia.com/jetson/common r36.4 main' > /etc/apt/sources.list.d/nvidia-l4t-apt-source.list; \
+            echo 'deb https://repo.download.nvidia.com/jetson/t234 r36.4 main' >> /etc/apt/sources.list.d/nvidia-l4t-apt-source.list; \
+        fi; \
         apt-get update; \
         apt-get install -y --no-install-recommends \
-            cuda-libraries-12-6 libcudnn9-cuda-12 \
-            libnvinfer-dev libnvinfer-plugin-dev libnvonnxparsers-dev \
-            vpi3-dev; \
+            libnvinfer-dev libnvinfer-plugin-dev libnvonnxparsers-dev; \
+        cuda_dash="$(echo "$JETSON_CUDA_VERSION" | tr . -)"; \
+        cuda_major="${JETSON_CUDA_VERSION%%.*}"; \
+        for pkg in "cuda-libraries-${cuda_dash}" "libcudnn9-cuda-${cuda_major}" vpi3-dev; do \
+            if apt-cache show "$pkg" >/dev/null 2>&1; then \
+                apt-get install -y --no-install-recommends "$pkg"; \
+            else \
+                echo "NOTE: $pkg not in the Jetson apt repo, skipping (host CUDA mount covers CUDA itself)"; \
+            fi; \
+        done; \
         rm -rf /var/lib/apt/lists/*; \
     fi
 
@@ -251,11 +273,13 @@ RUN set -eux; \
 # build (JetPack 6.x / CUDA 12.6 -- Microsoft's official PyPI package has no
 # aarch64+Tegra build). Prebuilt wheels don't ship C/C++ headers, so those
 # are fetched separately, straight from the onnxruntime source tree at the
-# matching version tag.
+# matching version tag. Pass an empty ONNXRUNTIME_JETSON_WHEEL_URL to skip
+# it (docker_build_jetson.sh does this on CUDA 13 / JetPack 7, which this
+# wheel isn't built for) -- only `device: CUDA` needs it, not TENSORRT.
 ARG ONNXRUNTIME_JETSON_VERSION=1.23.0
 ARG ONNXRUNTIME_JETSON_WHEEL_URL=https://github.com/ultralytics/assets/releases/download/v0.0.0/onnxruntime_gpu-1.23.0-cp310-cp310-linux_aarch64.whl
 RUN set -eux; \
-    if [ "$(uname -m)" = "aarch64" ]; then \
+    if [ "$(uname -m)" = "aarch64" ] && [ -n "$ONNXRUNTIME_JETSON_WHEEL_URL" ]; then \
         apt-get update && apt-get install -y --no-install-recommends unzip; \
         rm -rf /var/lib/apt/lists/*; \
         wget -q "$ONNXRUNTIME_JETSON_WHEEL_URL" -O /tmp/onnxruntime.whl; \

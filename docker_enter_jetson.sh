@@ -82,6 +82,16 @@ CONTAINER_NAME="sp_vision_jetson"
 IMAGE_NAME="sp_vision_25"
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
+# Host CUDA install (/usr/local/cuda-12.6 on JetPack 6, /usr/local/cuda-13.x
+# on JetPack 7) -- bind-mounted at its own versioned path and at
+# /usr/local/cuda, since the Jetson apt repo has no CUDA headers/nvcc
+# package (JETSON_ORIN.md §5.7) and device: TENSORRT needs both to build.
+CUDA_DIR="$(readlink -f /usr/local/cuda 2>/dev/null || true)"
+if [ -z "$CUDA_DIR" ] || [ ! -d "$CUDA_DIR" ]; then
+  echo "Could not find the host CUDA install (/usr/local/cuda). Install it with: sudo apt install nvidia-jetpack" >&2
+  exit 1
+fi
+
 HEADLESS=0
 for arg in "$@"; do
   case "$arg" in
@@ -130,7 +140,8 @@ elif [ "$HEADLESS" -eq 1 ]; then
     -e NVIDIA_VISIBLE_DEVICES=all \
     -e NVIDIA_DRIVER_CAPABILITIES=all \
     -v "${REPO_DIR}:/root/sp_vision_25" \
-    -v /usr/local/cuda-12.6:/usr/local/cuda-12.6:ro \
+    -v "${CUDA_DIR}:${CUDA_DIR}:ro" \
+    -v "${CUDA_DIR}:/usr/local/cuda:ro" \
     --privileged \
     -v /dev:/dev \
     "${IMAGE_NAME}" \
@@ -145,7 +156,8 @@ else
     -e QT_X11_NO_MITSHM=1 \
     -v /tmp/.X11-unix:/tmp/.X11-unix:rw \
     -v "${REPO_DIR}:/root/sp_vision_25" \
-    -v /usr/local/cuda-12.6:/usr/local/cuda-12.6:ro \
+    -v "${CUDA_DIR}:${CUDA_DIR}:ro" \
+    -v "${CUDA_DIR}:/usr/local/cuda:ro" \
     --privileged \
     -v /dev:/dev \
     "${IMAGE_NAME}" \

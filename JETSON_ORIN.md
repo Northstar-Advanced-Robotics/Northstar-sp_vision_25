@@ -149,8 +149,26 @@ see §5.3 below.
 On the Jetson Orin itself (recommended — no cross-compilation needed):
 
 ```bash
-docker build -t sp_vision_25 .
+./docker_build_jetson.sh
 ```
+
+This works on both **JetPack 6** (L4T R36, Ubuntu 22.04, CUDA 12.6) and
+**JetPack 7** (L4T R38+, Ubuntu 24.04, CUDA 13). It reads the host's
+`/etc/nv_tegra_release`, NVIDIA apt sources and `/usr/local/cuda` version,
+then passes them to `docker build` as build args, so the TensorRT packages in
+the image always match the host. A bare `docker build -t sp_vision_25 .` still
+works but uses the JetPack 6 (R36.4) defaults. Differences on JetPack 7:
+
+- Base image is `ubuntu:24.04` (override with `BASE_IMAGE=... ./docker_build_jetson.sh`).
+- `device: CUDA` (ONNX Runtime) is skipped: the community wheel is CUDA 12 only.
+  `device: TENSORRT` is unaffected.
+- `docker_enter_jetson.sh` mounts whatever `/usr/local/cuda` resolves to on the
+  host, so remove and recreate the `sp_vision_jetson` container after a JetPack
+  upgrade (`sudo docker rm -f sp_vision_jetson`), and delete `assets/*.engine`
+  so TensorRT rebuilds the engine for the new version.
+
+The code itself needs no changes between the two: both ship TensorRT 10, and
+Orin is compute capability 87 under either CUDA version.
 
 From an x86_64 machine, cross-building for the Jetson via buildx:
 

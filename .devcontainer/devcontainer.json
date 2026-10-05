@@ -19,8 +19,18 @@
 	// appendix for details, and for the native-Linux equivalent
 	// (`--device=/dev/dri` instead of this) if this repo is opened in a
 	// devcontainer on a real Linux host.
-	"runArgs": ["--device=/dev/dxg"],
-	"mounts": ["source=/usr/lib/wsl,target=/usr/lib/wsl,type=bind"]
+	//
+	// USB cameras: attach them to WSL from Windows with usbipd-win
+	// (`usbipd attach --wsl --busid <id>`), which makes /dev/videoN appear in
+	// the WSL VM. The cgroup rule (81 = V4L2 char-device major) plus the
+	// /dev bind mount let the container open them even when the camera is
+	// attached/replugged AFTER the container started -- a plain
+	// `--device=/dev/video0` would only work if it already existed at start.
+	"runArgs": ["--device=/dev/dxg", "--device-cgroup-rule=c 81:* rmw"],
+	"mounts": [
+		"source=/usr/lib/wsl,target=/usr/lib/wsl,type=bind",
+		"source=/dev,target=/dev,type=bind"
+	]
 
 	// Features to add to the dev container. More info: https://containers.dev/features.
 	// "features": {},
